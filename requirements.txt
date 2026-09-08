@@ -1,0 +1,4 @@
+# node-env GUI 运行与构建依赖（已在本项目 venv 验证）
+PySide6>=6.11.1
+nuitka>=4.1.3
+pytest>=9.1.1

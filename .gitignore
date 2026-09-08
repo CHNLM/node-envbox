@@ -1,0 +1,425 @@
+# =============================================================================
+# .gitignore — 通用模板
+# -----------------------------------------------------------------------------
+# 使用说明（Git 忽略规则核心语法）：
+#   · 每行一条忽略模式；空行与 # 开头的行被忽略（# 即注释）
+#   · 结尾带 /  → 仅匹配目录（连同目录内所有内容）
+#   · 不带 /    → 匹配任意层级的同名文件/目录（如 dist 匹配根及所有子目录）
+#   · 开头带 /  → 锚定本文件所在目录（根级文件即仓库根，如 /dist 只匹配根级）
+#   · 模式含中间 / → 相对本文件所在目录的路径（如 doc/frotz/ 匹配 doc/frotz）
+#   · * 匹配任意非 / 字符；? 匹配单个非 / 字符；[abc] 字符类；** 可跨目录
+#   · ** 用法：a/**/b 匹配 a/b、a/x/b、a/x/y/b；a/** 匹配 a 下所有层级
+#   · 前缀 ! 取反（重新包含）。注意：无法取反"已被忽略目录内部"的文件，
+#     必须先取反父目录：!dir/ 再 !dir/file.txt
+#   · 取反对"已被 Git 跟踪的文件"无效（gitignore 只影响未跟踪文件）
+#   · 行尾空格默认被忽略，需保留时用反斜杠转义：foo\ 
+#   · 大小写敏感（Windows/macOS 上受文件系统影响，建议保持小写一致）
+#
+# 常用命令：
+#   git status                    # 查看改动（被忽略文件不会出现）
+#   git check-ignore -v <path>    # 查看某路径被哪条规则、哪个文件忽略（排查用）
+#   git rm --cached <file>        # 已跟踪文件改为忽略：先从索引移除（保留本地文件）
+#
+# 优先级（就近覆盖，由低到高）：
+#   全局 core.excludesFile(~/.gitignore_global) < .git/info/exclude
+#   < 仓库根级 .gitignore < 子目录 .gitignore（可用 ! 覆盖父级规则）
+#
+# 组织约定：
+#   一 ~ 十二节为"通用默认忽略"（多语言/多工具链普适，安全开启）；
+#   标注【按需】的条目按项目实际情况取消注释或增删。
+#   ★ 作为新仓库模板使用时：直接复制本文件，并删除文末"项目特定"一节即可。
+# =============================================================================
+# 重要：Git 忽略语法不支持行尾注释 —— "# 注释" 会被解析进模式本身导致规则失效，
+# 本文件所有说明均使用独立注释行（整行以 # 开头），行内一律不带 #。
+
+# =============================================================================
+# 一、操作系统 / 系统文件
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# AppleDouble 隐藏资源文件
+._*
+# 自定义文件夹图标（macOS 的 Icon\r）
+Icon?
+# 备份文件（macOS/Unix 通用）
+*~
+
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# 快捷方式
+*.lnk
+*.url
+
+# 通用
+*.tmp
+*.bak
+
+# 其他版本控制系统目录（仓库从 SVN/Hg 迁移或目录拷贝残留时避免误入库）
+.svn/
+.hg/
+.bzr/
+
+
+# =============================================================================
+# 二、编辑器 / IDE
+# =============================================================================
+# VS Code / Cursor / Windsurf
+.vscode/
+.vscode-server/
+*.code-workspace
+
+# JetBrains 全家桶（IntelliJ / PyCharm / WebStorm / GoLand / Android Studio）
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Vim / Neovim（*~ 备份文件见"一、系统文件"区，不重复）
+*.swp
+*.swo
+*.un~
+.session.vim
+
+# Emacs（*~ 备份文件见"一、系统文件"区，不重复）
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Eclipse
+.classpath
+.project
+.settings/
+.metadata/
+*.launch
+
+# NetBeans
+nbproject/private/
+nbdist/
+nbbuild/
+
+
+# =============================================================================
+# 三、依赖与包管理（语言生态）
+# =============================================================================
+# ---- Node.js / npm / yarn / pnpm ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/cache/
+.pnpm-store/
+# 注意：package-lock.json / yarn.lock / pnpm-lock.yaml 属于"锁文件"，默认【应提交】
+# （保证构建可复现、依赖审计可追溯），故不在此忽略。如团队确认需忽略再取消注释：
+# yarn.lock
+# pnpm-lock.yaml
+# Yarn PnP（Berry）的 .pnp.cjs / .pnp.loader.mjs 同样建议提交（可复现安装），不忽略
+
+# ---- Python ----
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+pip-log.txt
+pip-delete-this-directory.txt
+.pytype/
+.pyre/
+# Python 打包产物
+*.egg-info/
+*.egg
+.eggs/
+*.whl
+
+# ---- Ruby / Bundler ----
+# vendor/bundle/           # 依赖目录（有 vendor 目录需提交的项目请保持注释）
+# 锁文件 Gemfile.lock 默认【应提交】（可复现构建），如团队约定忽略再取消注释：
+# Gemfile.lock
+
+# ---- PHP / Composer ----
+# vendor/
+# 锁文件 composer.lock 默认【应提交】（可复现构建），如团队约定忽略再取消注释：
+# composer.lock
+.phpunit.cache/
+.phpunit.result.cache
+
+# ---- Go ----
+# 注意：Go 的 pkg/ 目录是"公共包源码"（应提交），只有 vendor/ 是依赖目录（按需放开）
+*.coverprofile
+coverage.out
+
+# ---- Rust ----
+target/
+# Cargo.lock：库项目与应用项目均建议提交（锁定依赖版本，保证构建可复现）
+
+# ---- Java / Gradle / Maven ----
+# build/ target/ 见"四、构建产物"通用区，此处不重复
+*.jar
+*.war
+*.ear
+*.class
+*.hprof
+.gradle/
+.idea/gradle.xml
+
+# ---- C / C++ ----
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# ---- .NET / C# ----
+# bin/ obj/ 见"四、构建产物"通用区，此处不重复
+*.user
+*.suo
+# 注意：裸 packages/ 会误伤 monorepo 的源码目录，仅在确认是 NuGet 缓存目录时放开：
+# packages/
+TestResults/
+.vs/
+
+# ---- Swift / Xcode ----
+xcuserdata/
+DerivedData/
+.history/
+*.xcuserstate
+*.moved-aside
+.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ---- Android ----
+local.properties
+*.apk
+*.aab
+*.ap_
+captures/
+# keystore 通用规则见"六、敏感信息"区（*.keystore 已覆盖任意层级）
+!debug.keystore
+
+# ---- Flutter / Dart ----
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/generated_plugin_registrant.*
+.pub-cache/
+.pub/
+
+
+# =============================================================================
+# 四、编译 / 构建产物（通用）
+# =============================================================================
+dist/
+build/
+out/
+bin/
+obj/
+*.min.js.map
+.next/
+.nuxt/
+.output/
+.svelte-kit/
+.astro/
+.vercel/
+.netlify/
+.expo/
+.turbo/
+.nx/
+# 打包器缓存
+.parcel-cache/
+.vite/
+vite.config.*.timestamp-*
+# TypeScript 增量编译缓存
+*.tsbuildinfo
+
+
+# =============================================================================
+# 五、日志 / 临时 / 补丁
+# =============================================================================
+*.log
+*.log.*
+*.pid
+*.seed
+*.pid.lock
+*.lck
+*.orig
+*.rej
+*.patch
+core
+core.*
+# 崩溃转储
+*.stackdump
+
+
+# =============================================================================
+# 六、环境变量与敏感信息（密钥 / 凭据 / 证书）
+# =============================================================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+.env.staging
+# 兜底规则：忽略所有其他 .env 变体（.env.backup/.env.uat 等）。
+# .env.example / .env.sample 由文末"十二、保留文件"取反，不会被误伤。
+.env.*
+.git-credentials
+*.secret
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+.aws/credentials
+.gcloud/
+kubeconfig
+*.kubeconfig
+.kube/
+# 以上为通行安全基线：任何密钥/证书/云凭据都不应入库。
+# 若项目使用 .env.example 作为配置模板，请保留文件末尾的取反规则。
+
+
+# =============================================================================
+# 七、测试与覆盖率报告
+# =============================================================================
+coverage/
+htmlcov/
+.nyc_output/
+.coveralls.yml
+*.lcov
+test-results/
+playwright-report/
+cypress/videos/
+cypress/screenshots/
+junit.xml
+pytest.xml
+# .NET 测试结果
+*.trx
+
+
+# =============================================================================
+# 八、工具链缓存（前端 / 静态分析）
+# =============================================================================
+.cache/
+.tmp/
+tmp/
+.eslintcache
+.stylelintcache
+.prettiercache
+.rollup.cache/
+.php_cs.cache
+
+
+# =============================================================================
+# 九、基础设施 / 云平台
+# =============================================================================
+# Docker
+.docker/
+# Terraform（状态文件含敏感信息，务必忽略）
+*.tfstate
+*.tfstate.*
+.terraform/
+# Vagrant
+.vagrant/
+# Ansible
+*.retry
+# Kubernetes / Helm（kubeconfig/.kube 敏感凭据见"六、敏感信息"区）
+helm/**/charts/*.tgz
+# Cloudflare（本项目使用）
+.wrangler/
+.dev.vars
+
+
+# =============================================================================
+# 十、Agent / AI 协作工具
+# =============================================================================
+# 各类 AI Agent 的本地配置（如无需提交时保留）
+.agents/
+.copilot-plugin/
+# 注意：.github/ 目录【应提交】（GitHub Actions 工作流等），默认不忽略
+
+
+# =============================================================================
+# 十一、归档 / 媒体大文件（按需启用）
+# =============================================================================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+*.iso
+*.msi
+*.msix
+*.dmg
+*.pkg
+*.avi
+*.mov
+*.mp4
+*.mpg
+*.gif
+*.mkv
+# 说明：媒体/安装包一般不入库；若项目本身就管理这些文件（如素材库），删除对应行。
+
+# ---- 数据库文件（【按需】本地数据一般不入库；若项目需提交数据库模板/迁移文件则删除对应行）----
+# *.sqlite
+# *.sqlite3
+# *.db
+# *.mdb
+
+
+# =============================================================================
+# 十二、保留文件（默认不想忽略的内容用 ! 取反）
+# =============================================================================
+!*.env.example
+!*.env.sample
+!.gitkeep
+
+
+# =============================================================================
+# 项目特定说明（请勿随意删除）
+# =============================================================================
+
+# ---- node-env-gui ----
+# dist 为 Nuitka 打包产物（app.dist 可分发目录 / app.build 构建缓存），
+# 体积大且可再生，均不入库；打包产物改由 GitHub Actions 构建并在 Release 发布。
+dist/
+
+# 取反：通用规则 core.*（Linux core dump）会误伤本项目的核心模块
+!node_env/core.py
+
+# Nuitka 崩溃报告（调试残留，不入库）
+nuitka-crash-report.xml
+nuitka-crash-report.*.xml
+

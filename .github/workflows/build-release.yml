@@ -1,0 +1,155 @@
+name: Build & Release
+
+# 触发方式：
+#   - 手动触发（workflow_dispatch）：可选填版本号（如 1.0.0）→ 自动打 tag 并发布 Release；
+#     不填则只打包并上传 artifact
+#   - 打 v* 格式 tag（如 v1.0.0）：自动打包并发布 GitHub Release
+on:
+  workflow_dispatch:
+    inputs:
+      artifacts:
+        description: '要打包的产物类型'
+        type: choice
+        required: true
+        default: 'both'
+        options:
+          - both          # 目录版 + 单文件版
+          - app.dist      # 仅目录版（可分发的 app.dist 目录）
+          - onefile       # 仅单文件版（node-env.exe）
+      version:
+        description: '发布版本号（可留空）。填写（如 1.0.0）→ 自动创建 v<version> 标签并发布 Release'
+        type: string
+        required: false
+        default: ''
+
+# 关键：GITHUB_TOKEN 默认权限不足以创建 Release / 打 tag，必须显式声明 contents: write
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      # 非中文 Windows runner 默认 cp1252，无法编码中文 print/输出；统一 UTF-8
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: 创建 .venv 并安装依赖
+        run: uv venv && uv pip install -U pip -r requirements.txt
+
+      - name: 准备 MSVC 工具链
+        # GitHub Actions 的 windows-latest 自带 VS2022，但 cl.exe 不在默认 PATH。
+        # 通过 vswhere 定位安装路径后调用 vcvars64.bat 注入 PATH/INCLUDE/LIB，
+        # 使 build.py 的 _check_toolchain 能检测到 cl.exe。
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $vsPath) { Write-Error "未找到 Visual Studio"; exit 1 }
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (-not (Test-Path $vcvars)) { Write-Error "未找到 vcvars64.bat: $vcvars"; exit 1 }
+          # 把 vcvars64.bat 导出的变量写入 GITHUB_ENV，供后续 step 使用
+          cmd /c "`"$vcvars`" >nul 2>&1 && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+              Add-Content -Path $env:GITHUB_ENV -Value "$($matches[1])=$($matches[2])"
+            }
+          }
+          Write-Host "MSVC 工具链已注入"
+
+      - name: 运行单元测试
+        run: .venv\Scripts\python.exe -m pytest tests -q
+
+      - name: 打包（目录版）
+        if: inputs.artifacts != 'onefile'
+        run: .venv\Scripts\python.exe build.py
+
+      - name: 校验并收集（目录版）
+        # 目录版打包后立即压缩进 staging，避免后续单文件版复用 dist\app.dist 覆盖它。
+        if: always() && inputs.artifacts != 'onefile'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\app.dist\node-env.exe")) { Write-Error "缺少目录版产物"; exit 1 }
+          $size = (Get-Item "dist\app.dist\node-env.exe").Length / 1MB
+          Write-Host "目录版 node-env.exe 尺寸: $([math]::Round($size,1)) MB"
+          New-Item -ItemType Directory -Force -Path "staging\app.dist" | Out-Null
+          Compress-Archive -Path "dist\app.dist\*" -DestinationPath "staging\app.dist\node-env-app.dist.zip" -Force
+          Write-Host "目录版已收集到 staging\app.dist\node-env-app.dist.zip"
+
+      - name: 打包（单文件版）
+        if: inputs.artifacts != 'app.dist'
+        run: .venv\Scripts\python.exe build.py --onefile
+
+      - name: 校验并收集（单文件版）
+        if: always() && inputs.artifacts != 'app.dist'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\node-env.exe")) { Write-Error "缺少单文件版产物"; exit 1 }
+          $sz = (Get-Item "dist\node-env.exe").Length / 1MB
+          Write-Host "单文件版 node-env.exe 尺寸: $([math]::Round($sz,1)) MB"
+          New-Item -ItemType Directory -Force -Path "staging\onefile" | Out-Null
+          Copy-Item "dist\node-env.exe" "staging\onefile\node-env-onefile.exe" -Force
+          Write-Host "单文件版已收集到 staging\onefile\node-env-onefile.exe"
+
+      # 若手动触发且填了版本号：创建并推送 v<version> 标签（供后续 Release 使用）
+      - name: 创建并推送发布标签（手动模式）
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        shell: pwsh
+        run: |
+          $tag = "v${{ inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if (git rev-parse -q --verify "refs/tags/$tag") { Write-Host "标签 $tag 已存在，跳过创建" }
+          else { git tag -a $tag -m "Release $tag"; Write-Host "已创建标签 $tag" }
+          git push origin $tag
+          # 把 tag 名写入后续步骤可读的文件
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=$tag"
+
+      # 计算要发布的标签：tag 触发用当前 tag；手动+版本号用新打的 tag；否则为空
+      - name: 计算发布标签
+        id: release-tag
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $tag = $env:GITHUB_REF_NAME
+          } elseif ($env:RELEASE_TAG) {
+            $tag = $env:RELEASE_TAG
+          } else {
+            $tag = ''
+          }
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
+          Write-Host "发布标签: '$tag'"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v7
+        with:
+          name: node-envbox-build
+          # 递归子目录，确保 artifact 含产物文件而非空目录
+          path: |
+            staging/app.dist/**
+            staging/onefile/**
+
+      # 有发布标签（tag 触发 或 手动填了版本号）时创建 GitHub Release
+      - name: 创建/更新 GitHub Release
+        if: steps.release-tag.outputs.tag != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.release-tag.outputs.tag }}
+          # 显式列出各子目录产物（glob 需递归：dir/**）
+          files: |
+            staging/app.dist/**
+            staging/onefile/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 提示（未发布）
+        if: steps.release-tag.outputs.tag == ''
+        run: Write-Host "未指定版本号：仅上传 artifact，可到 Actions 页下载。填写 version 输入可自动发布。"
